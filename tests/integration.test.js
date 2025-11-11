@@ -48,7 +48,7 @@ describe('Integration Tests', () => {
       .reply(200, sampleHtmlWithYale);
     
     // Make a request to our proxy app
-    const response = await axios.post(`http://localhost:${TEST_PORT}/fetch`, {
+    const response = await axios.post(`http://127.0.0.1:${TEST_PORT}/fetch`, {
       url: 'https://example.com/'
     });
     
@@ -78,7 +78,7 @@ describe('Integration Tests', () => {
 
   test('Should handle invalid URLs', async () => {
     try {
-      await axios.post(`http://localhost:${TEST_PORT}/fetch`, {
+      await axios.post(`http://127.0.0.1:${TEST_PORT}/fetch`, {
         url: 'not-a-valid-url'
       });
       // Should not reach here
@@ -90,7 +90,7 @@ describe('Integration Tests', () => {
 
   test('Should handle missing URL parameter', async () => {
     try {
-      await axios.post(`http://localhost:${TEST_PORT}/fetch`, {});
+      await axios.post(`http://127.0.0.1:${TEST_PORT}/fetch`, {});
       // Should not reach here
       expect(true).toBe(false);
     } catch (error) {

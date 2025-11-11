@@ -41,7 +41,7 @@
         "lines": 0
       }
     },
-    "setupFilesAfterEnv": [
+    "setupFiles": [
       "<rootDir>/jest.setup.js"
     ]
   }

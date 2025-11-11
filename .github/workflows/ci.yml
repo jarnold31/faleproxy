@@ -2,9 +2,8 @@ name: Faleproxy CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ '**' ]
   pull_request:
-    branches: [ main, master ]
 
 jobs:
   test:
@@ -34,6 +33,20 @@ jobs:
       with:
         name: coverage-report
         path: coverage/
+
+  deploy_preview:
+    needs: test
+    runs-on: ubuntu-latest
+    if: success() && (github.event_name == 'pull_request' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'))
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (Preview)
+        run: npx vercel --confirm --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   deploy:
     needs: test
