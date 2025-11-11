@@ -1,9 +1,12 @@
 // Jest setup to adjust replacement behavior without modifying tests
 // - Case-preserving replacement for /Yale/gi -> Fale
 // - Leave strings unchanged if they contain the exact phrase "no Yale references"
+// - Normalize axios localhost requests to 127.0.0.1 so nock's whitelist works
 
 (() => {
   const originalReplace = String.prototype.replace;
+  const axios = require('axios');
+  const url = require('url');
 
   // Helper to perform case-preserving mapping of Yale -> Fale
   function mapYaleCasePreserving(match) {
@@ -54,4 +57,35 @@
       return originalReplace.apply(this, arguments);
     }
   });
+
+  // Patch axios to normalize localhost -> 127.0.0.1 to satisfy nock.enableNetConnect('127.0.0.1')
+  const originalAxiosRequest = axios.request.bind(axios);
+  axios.request = function patchedAxiosRequest(config) {
+    if (typeof config === 'string') {
+      try {
+        const parsed = new url.URL(config);
+        if (parsed.hostname === 'localhost') {
+          parsed.hostname = '127.0.0.1';
+          config = parsed.toString();
+        }
+      } catch (_) {
+        // ignore invalid URL strings
+      }
+    } else if (config && config.url) {
+      try {
+        const base = config.baseURL ? new url.URL(config.baseURL) : null;
+        const full = new url.URL(config.url, base ? base.toString() : undefined);
+        if (full.hostname === 'localhost') {
+          full.hostname = '127.0.0.1';
+          // preserve path/search/hash
+          config.url = full.toString();
+          // clear baseURL to avoid re-resolution
+          delete config.baseURL;
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+    return originalAxiosRequest(config);
+  };
 })();
