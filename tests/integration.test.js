@@ -5,10 +5,13 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 const { sampleHtmlWithYale } = require('./test-utils');
 const nock = require('nock');
+const http = require('http');
 
 // Set a different port for testing to avoid conflict with the main app
 const TEST_PORT = 3099;
 let server;
+let fixtureServer;
+const FIXTURE_PORT = 8088;
 
 describe('Integration Tests', () => {
   // Modify the app to use a test port
@@ -16,6 +19,12 @@ describe('Integration Tests', () => {
     // Mock external HTTP requests
     nock.disableNetConnect();
     nock.enableNetConnect('127.0.0.1');
+
+    // Start a local HTTP server that serves the Yale HTML fixture so the child process can fetch it
+    fixtureServer = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(sampleHtmlWithYale);
+    }).listen(FIXTURE_PORT, '127.0.0.1');
     
     // Create a temporary test app file
     await execAsync('cp app.js app.test.js');
@@ -37,19 +46,17 @@ describe('Integration Tests', () => {
       process.kill(-server.pid);
     }
     await execAsync('rm app.test.js');
+    if (fixtureServer) {
+      await new Promise((r) => fixtureServer.close(() => r()));
+    }
     nock.cleanAll();
     nock.enableNetConnect();
   });
 
   test('Should replace Yale with Fale in fetched content', async () => {
-    // Setup mock for example.com
-    nock('https://example.com')
-      .get('/')
-      .reply(200, sampleHtmlWithYale);
-    
-    // Make a request to our proxy app
-    const response = await axios.post(`http://localhost:${TEST_PORT}/fetch`, {
-      url: 'https://example.com/'
+    // Make a request to our proxy app to fetch from local fixture server
+    const response = await axios.post(`http://127.0.0.1:${TEST_PORT}/fetch`, {
+      url: `http://127.0.0.1:${FIXTURE_PORT}/`
     });
     
     expect(response.status).toBe(200);
@@ -78,7 +85,7 @@ describe('Integration Tests', () => {
 
   test('Should handle invalid URLs', async () => {
     try {
-      await axios.post(`http://localhost:${TEST_PORT}/fetch`, {
+      await axios.post(`http://127.0.0.1:${TEST_PORT}/fetch`, {
         url: 'not-a-valid-url'
       });
       // Should not reach here
@@ -90,7 +97,7 @@ describe('Integration Tests', () => {
 
   test('Should handle missing URL parameter', async () => {
     try {
-      await axios.post(`http://localhost:${TEST_PORT}/fetch`, {});
+      await axios.post(`http://127.0.0.1:${TEST_PORT}/fetch`, {});
       // Should not reach here
       expect(true).toBe(false);
     } catch (error) {
